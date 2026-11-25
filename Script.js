@@ -47,7 +47,17 @@ function main(config) {
     groups.push({name,type:"select",proxies:buckets[i],hidden:false});
   });
   if(!groups.length)return config;
-  const choices=groups.map(g=>g.name);
+  const autoGroups=[];
+  const choices=[];
+  for(const g of groups){
+    choices.push(g.name);
+    if(g.proxies.length<2)continue;
+    let name=g.name+" · 自动选择";
+    while(used.has(name))name+=" ·";
+    used.add(name);
+    autoGroups.push({name,type:"url-test",proxies:[...g.proxies],url:"https://www.apple.com/library/test/success.html",interval:600,tolerance:50,lazy:true,hidden:true});
+    choices.push(name);
+  }
   const originalNodes=new Set((config.proxies||[]).map(p=>p.name));
   const missing=(config.proxies||[]).filter(p=>!groups.some(g=>g.proxies.includes(p.name))&&!/剩余流量|套餐到期|请勿分享订阅链接/.test(p.name));
   // Unrecognized future nodes remain accessible via original groups, never create empty regions.
@@ -55,6 +65,6 @@ function main(config) {
   for(const k of ["include-all","include-all-proxies","include-all-providers","use","filter","exclude-filter","exclude-type","default-selected"])delete mainGroup[k];
   const retained=old.filter(g=>g.name!==root.name&&g.name!=="GLOBAL").map(g=>({...g,hidden:true}));
   const global={name:"GLOBAL",type:"select",proxies:[root.name,...choices,...missing.map(p=>p.name),"DIRECT"]};
-  config["proxy-groups"]=[mainGroup,...groups,...retained,global];
+  config["proxy-groups"]=[mainGroup,...groups,...autoGroups,...retained,global];
   return config;
 }
