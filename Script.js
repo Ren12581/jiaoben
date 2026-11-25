@@ -62,9 +62,38 @@ function main(config) {
   // Keep original group references valid; show only country pairs in both main selectors.
   const mainGroup={...root,type:"select",proxies:[...choices],hidden:false};
   for(const k of ["include-all","include-all-proxies","include-all-providers","use","filter","exclude-filter","exclude-type","default-selected"])delete mainGroup[k];
-  const retained=old.filter(g=>g.name!==root.name&&g.name!=="GLOBAL").map(g=>({...g,hidden:true}));
+  // Keep only the main selectors, country pairs and two independent service selectors.
+  const services=["AI","Google"].map(name=>{
+    const previous=old.find(g=>g.name===name);
+    const usAuto=choices.find(n=>n==="🇺🇸 美国自动")||choices.find(n=>n==="🇺🇸 美国");
+    const preferred=name==="AI"&&usAuto?[usAuto]:[root.name];
+    const g={...previous,name,type:"select",proxies:[...new Set([...preferred,root.name,...choices])],hidden:false};
+    for(const k of ["include-all","include-all-proxies","include-all-providers","use","filter","exclude-filter","exclude-type","default-selected"])delete g[k];
+    return g;
+  });
   const global={name:"GLOBAL",type:"select",proxies:[...choices],hidden:false};
   const ordered=groups.flatMap(g=>[g,...autoGroups.filter(a=>g.proxies[0]===a.name)]);
-  config["proxy-groups"]=[global,mainGroup,...ordered,...retained];
+  const finalGroups=[global,mainGroup,...services,...ordered];
+  const keep=new Set(finalGroups.map(g=>g.name));
+  const removed=new Set(old.map(g=>g.name).filter(n=>!keep.has(n)));
+  const target=n=>removed.has(n)?root.name:n;
+  // Only rewrite the policy target, not the domain, matcher, or rule order.
+  const rewriteRule=rule=>{
+    if(typeof rule!=="string")return rule;
+    const parts=rule.split(",");
+    let i=parts.length-1;
+    while(i>0&&/^(?:no-resolve|src)$/i.test(parts[i].trim()))i--;
+    const n=parts[i].trim();
+    if(removed.has(n))parts[i]=parts[i].replace(n,root.name);
+    return parts.join(",");
+  };
+  if(Array.isArray(config.rules))config.rules=config.rules.map(rewriteRule);
+  if(config["sub-rules"])for(const k of Object.keys(config["sub-rules"]))if(Array.isArray(config["sub-rules"][k]))config["sub-rules"][k]=config["sub-rules"][k].map(rewriteRule);
+  // Rule-provider downloads and other explicit group references must not point at deleted groups.
+  for(const key of ["rule-providers","proxy-providers"]){
+    for(const p of Object.values(config[key]||{}))if(p&&typeof p.proxy==="string")p.proxy=target(p.proxy);
+  }
+  for(const p of config.proxies||[])if(typeof p["dialer-proxy"]==="string")p["dialer-proxy"]=target(p["dialer-proxy"]);
+  config["proxy-groups"]=finalGroups;
   return config;
 }
