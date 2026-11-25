@@ -1,5 +1,6 @@
 // Yue.to country grouping only. Original network settings and rules are retained.
 function main(config) {
+  const testUrl = "https://www.gstatic.com/generate_204";
   const defs = [
     ["香港","HK","🇭🇰",/香港|Hong\s*Kong|\bHK\b/i],
     ["台湾","TW","🇹🇼",/台湾|臺灣|台灣|Taiwan|\bTW\b/i],
@@ -55,7 +56,7 @@ function main(config) {
     let name=g.name+"自动";
     while(used.has(name))name+=" ·";
     used.add(name);
-    autoGroups.push({name,type:"url-test",proxies:[...g.proxies],url:"https://www.apple.com/library/test/success.html",interval:600,tolerance:50,lazy:true,hidden:false});
+    autoGroups.push({name,type:"url-test",proxies:[...g.proxies],url:testUrl,interval:600,tolerance:50,lazy:true,hidden:false});
     g.proxies.unshift(name);
     choices.push(name);
   }
@@ -94,6 +95,7 @@ function main(config) {
     for(const p of Object.values(config[key]||{}))if(p&&typeof p.proxy==="string")p.proxy=target(p.proxy);
   }
   for(const p of config.proxies||[])if(typeof p["dialer-proxy"]==="string")p["dialer-proxy"]=target(p["dialer-proxy"]);
+  for(const g of finalGroups)g.url=testUrl;
   config["proxy-groups"]=finalGroups;
   return config;
 }
